@@ -13,6 +13,7 @@ import (
 // GitHubClient is the subset of the GitHub client the reporter needs.
 type GitHubClient interface {
 	GetProjectItems(ctx context.Context, projectID string) ([]github.ProjectItem, error)
+	GetProjectItem(ctx context.Context, itemID string) (*github.ProjectItem, error)
 }
 
 // BaleClient is the subset of the Bale client the reporter needs.
@@ -36,6 +37,48 @@ func New(gh GitHubClient, bl BaleClient, urgencyDays int) *Reporter {
 		urgencyDays = 2
 	}
 	return &Reporter{github: gh, bale: bl, urgencyDays: urgencyDays, now: time.Now}
+}
+
+// SendNotification sends a single-item event notification to the chat.
+func (r *Reporter) SendNotification(ctx context.Context, chatID, itemID string, event string, sender string) error {
+	item, err := r.github.GetProjectItem(ctx, itemID)
+	if err != nil {
+		_ = r.bale.SendMessage(ctx, chatID, fmt.Sprintf("⚠️ Could not fetch item details for %s.", itemID))
+		return fmt.Errorf("fetch item: %w", err)
+	}
+	msg := FormatNotification(item, event, sender)
+	return r.bale.SendMessage(ctx, chatID, msg)
+}
+
+// FormatNotification formats a single-item change into a short message.
+func FormatNotification(item *github.ProjectItem, event, sender string) string {
+	title := item.Title
+	if item.URL != "" {
+		title = fmt.Sprintf("[%s](%s)", item.Title, item.URL)
+	}
+
+	assigneeStr := ""
+	if len(item.Assignees) > 0 {
+		assigneeStr = fmt.Sprintf(" (assigned: %s)", strings.Join(item.Assignees, ", "))
+	}
+
+	statusStr := ""
+	if item.Status != "" {
+		statusStr = fmt.Sprintf(" → %s", item.Status)
+	}
+
+	switch event {
+	case "created":
+		return fmt.Sprintf("🆕 %s added %s%s%s", sender, title, statusStr, assigneeStr)
+	case "edited":
+		return fmt.Sprintf("✏️ %s updated %s%s", sender, title, statusStr)
+	case "moved":
+		return fmt.Sprintf("↔️ %s moved %s%s", sender, title, statusStr)
+	case "deleted":
+		return fmt.Sprintf("🗑️ %s removed %s from the board", sender, title)
+	default:
+		return fmt.Sprintf("ℹ️ %s changed %s%s", sender, title, statusStr)
+	}
 }
 
 // SendReport fetches the project board and posts a report to the chat.

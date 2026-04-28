@@ -12,6 +12,91 @@ import (
 
 const graphqlEndpoint = "https://api.github.com/graphql"
 
+// GetProjectItem fetches a single item by its node ID.
+func (c *Client) GetProjectItem(ctx context.Context, itemID string) (*ProjectItem, error) {
+	query := fmt.Sprintf(`{
+  node(id: "%s") {
+    ... on ProjectV2Item {
+      id
+      type
+      content {
+        ... on Issue { title number url state assignees(first: 10) { nodes { login } } }
+        ... on PullRequest { title number url state assignees(first: 10) { nodes { login } } }
+        ... on DraftIssue { title assignees(first: 10) { nodes { login } } }
+      }
+      fieldValues(first: 50) {
+        nodes {
+          ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2Field { name } } }
+          ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2Field { name } } }
+        }
+      }
+    }
+  }
+}`, itemID)
+
+	body, err := c.doGraphQL(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("graphql request: %w", err)
+	}
+
+	var resp singleItemResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("graphql errors: %v", resp.Errors)
+	}
+
+	item := resp.Data.Node
+	pi := &ProjectItem{
+		ID:    item.ID,
+		Type:  item.Type,
+		State: item.itemState(),
+	}
+	if item.Content.Title != "" {
+		pi.Title = item.Content.Title
+		pi.URL = item.Content.URL
+	}
+	for _, a := range item.Content.Assignees.Nodes {
+		pi.Assignees = append(pi.Assignees, a.Login)
+	}
+	for _, fv := range item.FieldValues.Nodes {
+		if fv.Date != "" {
+			t, err := time.Parse("2006-01-02", fv.Date)
+			if err == nil {
+				pi.DueDate = &t
+			}
+		}
+		if fv.Name != "" {
+			pi.Status = fv.Name
+		}
+	}
+	return pi, nil
+}
+
+type singleItemResponse struct {
+	Data   singleItemData `json:"data"`
+	Errors []graphQLError `json:"errors,omitempty"`
+}
+
+type singleItemData struct {
+	Node singleItemNode `json:"node"`
+}
+
+type singleItemNode struct {
+	ID          string          `json:"id"`
+	Type        string          `json:"type"`
+	Content     contentNode     `json:"content"`
+	FieldValues fieldValuePage  `json:"fieldValues"`
+}
+
+func (n singleItemNode) itemState() string {
+	if n.Content.State != "" {
+		return n.Content.State
+	}
+	return n.Type
+}
+
 // GetProjectItems fetches all items from a ProjectsV2 board.
 func (c *Client) GetProjectItems(ctx context.Context, projectID string) ([]ProjectItem, error) {
 	var allItems []ProjectItem

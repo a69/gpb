@@ -1,0 +1,45 @@
+name: project-events
+on:
+  project_v2_item:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+    inputs:
+      item_id:
+        description: "ProjectsV2 item node ID (PVTI_...)"
+        required: true
+      event:
+        description: "Event type"
+        required: true
+        type: choice
+        options: [created, edited, moved, deleted]
+      sender:
+        description: "GitHub username"
+        required: true
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: send-notification
+        run: |
+          ITEM_ID="${{ github.event.projects_v2_item.node_id }}"
+          EVENT="${{ github.event.action }}"
+          SENDER="${{ github.event.sender.login }}"
+
+          # workflow_dispatch fallback
+          if [ -z "$ITEM_ID" ]; then
+            ITEM_ID="${{ github.event.inputs.item_id }}"
+            EVENT="${{ github.event.inputs.event }}"
+            SENDER="${{ github.event.inputs.sender }}"
+          fi
+
+          go run ./cmd/gpb notify \
+            --github-token="${{ secrets.GITHUB_TOKEN }}" \
+            --item-id="$ITEM_ID" \
+            --event="$EVENT" \
+            --sender="$SENDER" \
+            --bale-token="${{ secrets.BALE_TOKEN }}" \
+            --chat-id="${{ vars.CHAT_ID }}"

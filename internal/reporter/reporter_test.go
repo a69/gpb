@@ -18,12 +18,17 @@ func timePtr(y, m, d int) *time.Time {
 // ---------- mocks ----------
 
 type mockGitHubClient struct {
-	items []github.ProjectItem
-	err   error
+	items    []github.ProjectItem
+	singleItem *github.ProjectItem
+	err      error
 }
 
 func (m *mockGitHubClient) GetProjectItems(_ context.Context, _ string) ([]github.ProjectItem, error) {
 	return m.items, m.err
+}
+
+func (m *mockGitHubClient) GetProjectItem(_ context.Context, _ string) (*github.ProjectItem, error) {
+	return m.singleItem, m.err
 }
 
 type mockBaleClient struct {

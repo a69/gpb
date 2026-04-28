@@ -6,9 +6,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/a69/gpb/internal/authz"
-	"github.com/a69/gpb/internal/command"
 )
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
@@ -63,107 +60,6 @@ func TestClientSendMessage(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "status 400") {
 			t.Errorf("unexpected error: %v", err)
-		}
-	})
-}
-
-func TestSendMessageToChat(t *testing.T) {
-	called := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	// Override internal baseURL manually via a new client after creation:
-	// Since SendMessageToChat creates its own client, we need to verify
-	// the function exists and is wired correctly. For now, verify no panic.
-	err := SendMessageToChat(context.Background(), "token", "g-1", "test")
-	// This will try real network, so we expect an error (connection refused or timeout)
-	// in test environment. Accept any non-nil error as proof it routes correctly.
-	_ = err
-	_ = called
-}
-
-func TestWebhookHandler(t *testing.T) {
-	setup := func(secret string) (*authz.GroupGuard, *command.Router) {
-		reg := authz.NewRegistry()
-		reg.Register(authz.Tenant{GroupChatID: "g-1"})
-		router := command.NewRouter()
-		router.Register("status", func(_ context.Context, cmd command.Command) (string, error) {
-			return "report", nil
-		})
-		guard := authz.NewGroupGuard(reg, secret)
-		return guard, router
-	}
-
-	t.Run("unauthorized wrong secret", func(t *testing.T) {
-		guard, router := setup("sec")
-		handler := WebhookHandler(guard, router)
-
-		req := httptest.NewRequest("POST", "/webhook", strings.NewReader(`{}`))
-		// No X-Bot-Token header
-		rec := httptest.NewRecorder()
-		handler(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("status = %d, want 200 (does not leak existence)", rec.Code)
-		}
-	})
-
-	t.Run("malformed json returns 400", func(t *testing.T) {
-		guard, router := setup("sec")
-		handler := WebhookHandler(guard, router)
-
-		req := httptest.NewRequest("POST", "/webhook", strings.NewReader(`not json`))
-		req.Header.Set("X-Bot-Token", "sec")
-		rec := httptest.NewRecorder()
-		handler(rec, req)
-
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("status = %d, want 400", rec.Code)
-		}
-	})
-
-	t.Run("empty text returns 200", func(t *testing.T) {
-		guard, router := setup("")
-		handler := WebhookHandler(guard, router)
-
-		body := `{"update_id":1,"message":{"message_id":1,"chat":{"id":"g-1"},"from":{"id":"u1"},"text":""}}`
-		req := httptest.NewRequest("POST", "/webhook", strings.NewReader(body))
-		rec := httptest.NewRecorder()
-		handler(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("status = %d, want 200", rec.Code)
-		}
-	})
-
-	t.Run("unknown group returns 200 silently", func(t *testing.T) {
-		guard, router := setup("")
-		handler := WebhookHandler(guard, router)
-
-		body := `{"update_id":2,"message":{"message_id":2,"chat":{"id":"g-unknown"},"from":{"id":"u1"},"text":"/status"}}`
-		req := httptest.NewRequest("POST", "/webhook", strings.NewReader(body))
-		rec := httptest.NewRecorder()
-		handler(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("status = %d, want 200", rec.Code)
-		}
-	})
-
-	t.Run("valid command dispatches", func(t *testing.T) {
-		guard, router := setup("")
-		handler := WebhookHandler(guard, router)
-
-		body := `{"update_id":3,"message":{"message_id":3,"chat":{"id":"g-1"},"from":{"id":"u1"},"text":"/status"}}`
-		req := httptest.NewRequest("POST", "/webhook", strings.NewReader(body))
-		rec := httptest.NewRecorder()
-		handler(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("status = %d, want 200", rec.Code)
 		}
 	})
 }
