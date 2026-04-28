@@ -22,9 +22,10 @@ type BaleClient interface {
 
 // Reporter fetches project data, formats it, and posts to chat.
 type Reporter struct {
-	github GitHubClient
-	bale   BaleClient
+	github      GitHubClient
+	bale        BaleClient
 	urgencyDays int
+	now         func() time.Time
 }
 
 const maxMessageLen = 4000
@@ -34,7 +35,7 @@ func New(gh GitHubClient, bl BaleClient, urgencyDays int) *Reporter {
 	if urgencyDays <= 0 {
 		urgencyDays = 2
 	}
-	return &Reporter{github: gh, bale: bl, urgencyDays: urgencyDays}
+	return &Reporter{github: gh, bale: bl, urgencyDays: urgencyDays, now: time.Now}
 }
 
 // SendReport fetches the project board and posts a report to the chat.
@@ -61,7 +62,7 @@ func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) err
 
 // Format builds a human-readable markdown summary of the project items.
 func (r *Reporter) Format(items []github.ProjectItem) string {
-	now := time.Now().Truncate(24 * time.Hour)
+	now := r.now().Truncate(24 * time.Hour)
 	urgentThreshold := now.AddDate(0, 0, r.urgencyDays)
 
 	type group struct {

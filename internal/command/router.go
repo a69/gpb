@@ -48,17 +48,17 @@ func Parse(text string) Command {
 		return Command{}
 	}
 
-	// Strip bot mention suffix: "/status@gpb_bot" → "/status"
-	if idx := strings.Index(text, "@"); idx > 0 {
-		text = text[:idx]
-	}
-
 	parts := strings.Fields(text)
 	if len(parts) == 0 {
 		return Command{}
 	}
 
+	// Strip bot mention suffix from first token only: "/status@gpb_bot" → "/status"
 	name := strings.TrimPrefix(parts[0], "/")
+	if idx := strings.Index(name, "@"); idx > 0 {
+		name = name[:idx]
+	}
+
 	var args []string
 	if len(parts) > 1 {
 		args = parts[1:]

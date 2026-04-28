@@ -18,17 +18,23 @@ const baseURL = "https://tapi.bale.ai"
 
 // Client sends messages to Bale chats.
 type Client struct {
-	token string
+	token      string
+	httpClient *http.Client
+	baseURL    string
 }
 
 // NewClient creates a Bale client with the given bot token.
 func NewClient(token string) *Client {
-	return &Client{token: token}
+	return &Client{
+		token:      token,
+		httpClient: http.DefaultClient,
+		baseURL:    "https://tapi.bale.ai",
+	}
 }
 
 // SendMessage posts text to a chat.
 func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
-	endpoint := fmt.Sprintf("%s/bot%s/sendMessage", baseURL, c.token)
+	endpoint := fmt.Sprintf("%s/bot%s/sendMessage", c.baseURL, c.token)
 	form := url.Values{}
 	form.Set("chat_id", chatID)
 	form.Set("text", text)
@@ -40,7 +46,7 @@ func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -55,7 +61,7 @@ func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
 
 // SetWebhook registers the bot's webhook URL.
 func (c *Client) SetWebhook(ctx context.Context, webhookURL string) error {
-	endpoint := fmt.Sprintf("%s/bot%s/setWebhook", baseURL, c.token)
+	endpoint := fmt.Sprintf("%s/bot%s/setWebhook", c.baseURL, c.token)
 	form := url.Values{}
 	form.Set("url", webhookURL)
 
@@ -65,7 +71,7 @@ func (c *Client) SetWebhook(ctx context.Context, webhookURL string) error {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}

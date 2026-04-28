@@ -13,10 +13,12 @@ type Scheduler struct {
 	mu   sync.Mutex
 }
 
-// New creates a new scheduler.
-func New() *Scheduler {
+// New creates a new scheduler. Optional cron.Option arguments are passed to the
+// underlying cron instance (e.g., cron.WithSeconds() for 6-field specs).
+func New(opts ...cron.Option) *Scheduler {
+	defaultOpts := []cron.Option{cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger))}
 	return &Scheduler{
-		cron: cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger))),
+		cron: cron.New(append(defaultOpts, opts...)...),
 	}
 }
 

@@ -75,30 +75,34 @@ func (c *Client) GetProjectItems(ctx context.Context, projectID string) ([]Proje
 }
 
 func (c *Client) doGraphQL(ctx context.Context, query string) ([]byte, error) {
-	payload := fmt.Sprintf(`{"query": %q}`, query)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, graphqlEndpoint, strings.NewReader(payload))
+	body, err := json.Marshal(map[string]string{"query": query})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	var respBody []byte
+	respBody, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return body, nil
+	return respBody, nil
 }
 
 func buildQuery(projectID, cursor string) string {

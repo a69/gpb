@@ -35,7 +35,7 @@ type LoggingConfig struct {
 	Format string `yaml:"format"`
 }
 
-var envVarRE = regexp.MustCompile(`^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$`)
+var envVarRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
