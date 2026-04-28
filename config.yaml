@@ -1,0 +1,17 @@
+server:
+  listen: ":8080"
+  webhook_path: "/webhook"
+  webhook_secret: "${WEBHOOK_SECRET}"
+
+tenants:
+  - name: "team-alpha"
+    github_token: "${GITHUB_TOKEN_ALPHA}"
+    github_project_id: "${GITHUB_PROJECT_ID_ALPHA}"
+    bale_token: "${BALE_TOKEN_ALPHA}"
+    group_chat_id: "${GROUP_CHAT_ID_ALPHA}"
+    cron_spec: "0 9 * * *"
+    urgency_days: 2
+
+logging:
+  level: "info"
+  format: "json"
