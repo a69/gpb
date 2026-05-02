@@ -1,0 +1,42 @@
+name: project-events (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      item-id:
+        required: true
+        type: string
+      event:
+        required: true
+        type: string
+      sender:
+        required: true
+        type: string
+      chat-id:
+        required: true
+        type: string
+    secrets:
+      github-token:
+        required: true
+      bale-token:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: a69/gpb
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: send-notification
+        run: |
+          go run ./cmd/gpb notify \
+            --github-token="${{ secrets.github-token }}" \
+            --item-id="${{ inputs.item-id }}" \
+            --event="${{ inputs.event }}" \
+            --sender="${{ inputs.sender }}" \
+            --bale-token="${{ secrets.bale-token }}" \
+            --chat-id="${{ inputs.chat-id }}"
