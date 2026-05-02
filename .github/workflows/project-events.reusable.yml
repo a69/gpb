@@ -1,6 +1,21 @@
 name: project-events (reusable)
 
 on:
+  project_v2_item:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+    inputs:
+      item_id:
+        description: "ProjectsV2 item node ID (PVTI_...)"
+        required: true
+      event:
+        description: "Event type"
+        required: true
+        type: choice
+        options: [created, edited, moved, deleted]
+      sender:
+        description: "GitHub username"
+        required: true
   workflow_call:
     inputs:
       item-id:
@@ -32,11 +47,18 @@ jobs:
         with:
           go-version: "1.24"
       - name: send-notification
+        env:
+          ITEM_ID: ${{ inputs.item-id || github.event.projects_v2_item.node_id || github.event.inputs.item_id }}
+          EVENT: ${{ inputs.event || github.event.action || github.event.inputs.event }}
+          SENDER: ${{ inputs.sender || github.event.sender.login || github.event.inputs.sender }}
+          GH_TOKEN: ${{ secrets.github-token || secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          BALE_TOKEN: ${{ secrets.bale-token || secrets.BALE_TOKEN }}
+          CHAT_ID: ${{ inputs.chat-id || vars.CHAT_ID }}
         run: |
           go run ./cmd/gpb notify \
-            --github-token="${{ secrets.github-token }}" \
-            --item-id="${{ inputs.item-id }}" \
-            --event="${{ inputs.event }}" \
-            --sender="${{ inputs.sender }}" \
-            --bale-token="${{ secrets.bale-token }}" \
-            --chat-id="${{ inputs.chat-id }}"
+            --github-token="${GH_TOKEN}" \
+            --item-id="${ITEM_ID}" \
+            --event="${EVENT}" \
+            --sender="${SENDER}" \
+            --bale-token="${BALE_TOKEN}" \
+            --chat-id="${CHAT_ID}"
