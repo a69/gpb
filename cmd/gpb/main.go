@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/a69/gpb/internal/bale"
@@ -38,7 +39,13 @@ func runReport() {
 	projectID := fs.String("project-id", os.Getenv("PROJECT_ID"), "GitHub ProjectsV2 node ID")
 	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token")
 	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Bale group chat ID")
-	urgencyDays := fs.Int("urgency-days", 2, "Days threshold for urgent flag")
+	urgencyDefault := 2
+	if v := os.Getenv("URGENCY_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			urgencyDefault = n
+		}
+	}
+	urgencyDays := fs.Int("urgency-days", urgencyDefault, "Days threshold for urgent flag")
 	fs.Parse(os.Args[2:])
 
 	gh := github.NewClient(*githubToken)
@@ -64,7 +71,13 @@ func runNotify() {
 	sender := fs.String("sender", os.Getenv("SENDER"), "GitHub username who triggered the event")
 	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token")
 	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Bale group chat ID")
-	urgencyDays := fs.Int("urgency-days", 2, "Days threshold for urgent flag")
+	urgencyDefault := 2
+	if v := os.Getenv("URGENCY_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			urgencyDefault = n
+		}
+	}
+	urgencyDays := fs.Int("urgency-days", urgencyDefault, "Days threshold for urgent flag")
 	fs.Parse(os.Args[2:])
 
 	gh := github.NewClient(*githubToken)
