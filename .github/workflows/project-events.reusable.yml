@@ -1,8 +1,6 @@
 name: project-events (reusable)
 
 on:
-  project_v2_item:
-    types: [created, edited, deleted]
   workflow_dispatch:
     inputs:
       item_id:
