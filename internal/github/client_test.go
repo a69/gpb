@@ -46,7 +46,7 @@ func graphQLHandler(responses []string, statuses []int) http.HandlerFunc {
 		}
 		if call >= len(responses) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"data": {"node": {"items": {"pageInfo": {"hasNextPage": false}, "nodes": []}}}}`))
+			w.Write([]byte(`{"data": {"node": {"title": "Test Board","items": {"pageInfo": {"hasNextPage": false}, "nodes": []}}}}`))
 			return
 		}
 		status := http.StatusOK
@@ -94,9 +94,12 @@ func TestGetProjectItems(t *testing.T) {
 		})
 		c := newTestClient(t, graphQLHandler([]string{resp}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if title == "" {
+			t.Error("expected non-empty project title")
 		}
 		if len(items) != 1 {
 			t.Fatalf("expected 1 item, got %d", len(items))
@@ -127,7 +130,7 @@ func TestGetProjectItems(t *testing.T) {
 
 	t.Run("paginated", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{
-			`{"data": {"node": {"items": {
+			`{"data": {"node": {"title": "Test Board","items": {
 				"pageInfo": {"hasNextPage": true, "endCursor": "cursor1"},
 				"nodes": [{
 					"id": "1", "type": "ISSUE",
@@ -135,7 +138,7 @@ func TestGetProjectItems(t *testing.T) {
 					"fieldValues": {"nodes": []}
 				}]
 			}}}}`,
-			`{"data": {"node": {"items": {
+			`{"data": {"node": {"title": "Test Board","items": {
 				"pageInfo": {"hasNextPage": false, "endCursor": ""},
 				"nodes": [{
 					"id": "2", "type": "PULL_REQUEST",
@@ -145,9 +148,12 @@ func TestGetProjectItems(t *testing.T) {
 			}}}}`,
 		}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if title == "" {
+			t.Error("expected non-empty project title")
 		}
 		if len(items) != 2 {
 			t.Fatalf("expected 2 items, got %d", len(items))
@@ -162,7 +168,7 @@ func TestGetProjectItems(t *testing.T) {
 
 	t.Run("draft issue has no url", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{
-			`{"data": {"node": {"items": {
+			`{"data": {"node": {"title": "Test Board","items": {
 				"pageInfo": {"hasNextPage": false},
 				"nodes": [{
 					"id": "1", "type": "DraftIssue",
@@ -172,10 +178,11 @@ func TestGetProjectItems(t *testing.T) {
 			}}}}`,
 		}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		_ = title
 		if items[0].URL != "" {
 			t.Errorf("URL should be empty for draft, got %q", items[0].URL)
 		}
@@ -189,7 +196,7 @@ func TestGetProjectItems(t *testing.T) {
 			`{"errors": [{"message": "Resource not accessible by integration"}]}`,
 		}, nil))
 
-		_, err := c.GetProjectItems(context.Background(), "PVT_1")
+		_, _, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -201,7 +208,7 @@ func TestGetProjectItems(t *testing.T) {
 	t.Run("http error", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{""}, []int{http.StatusInternalServerError}))
 
-		_, err := c.GetProjectItems(context.Background(), "PVT_1")
+		_, _, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -213,7 +220,7 @@ func TestGetProjectItems(t *testing.T) {
 	t.Run("malformed json", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{`{invalid`}, nil))
 
-		_, err := c.GetProjectItems(context.Background(), "PVT_1")
+		_, _, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -224,12 +231,15 @@ func TestGetProjectItems(t *testing.T) {
 
 	t.Run("empty board", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{
-			`{"data": {"node": {"items": {"pageInfo": {"hasNextPage": false}, "nodes": []}}}}`,
+			`{"data": {"node": {"title": "Test Board","items": {"pageInfo": {"hasNextPage": false}, "nodes": []}}}}`,
 		}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if title == "" {
+			t.Error("expected non-empty project title")
 		}
 		if len(items) != 0 {
 			t.Errorf("expected 0 items, got %d", len(items))
@@ -238,7 +248,7 @@ func TestGetProjectItems(t *testing.T) {
 
 	t.Run("multiple assignees", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{
-			`{"data": {"node": {"items": {
+			`{"data": {"node": {"title": "Test Board","items": {
 				"pageInfo": {"hasNextPage": false},
 				"nodes": [{
 					"id": "1", "type": "ISSUE",
@@ -248,10 +258,11 @@ func TestGetProjectItems(t *testing.T) {
 			}}}}`,
 		}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		_ = title
 		if len(items[0].Assignees) != 2 {
 			t.Errorf("expected 2 assignees, got %v", items[0].Assignees)
 		}
@@ -262,7 +273,7 @@ func TestGetProjectItems(t *testing.T) {
 
 	t.Run("invalid date string silently ignored", func(t *testing.T) {
 		c := newTestClient(t, graphQLHandler([]string{
-			`{"data": {"node": {"items": {
+			`{"data": {"node": {"title": "Test Board","items": {
 				"pageInfo": {"hasNextPage": false},
 				"nodes": [{
 					"id": "1", "type": "ISSUE",
@@ -272,10 +283,11 @@ func TestGetProjectItems(t *testing.T) {
 			}}}}`,
 		}, nil))
 
-		items, err := c.GetProjectItems(context.Background(), "PVT_1")
+		title, items, err := c.GetProjectItems(context.Background(), "PVT_1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		_ = title
 		if items[0].DueDate != nil {
 			t.Error("DueDate should be nil for invalid date")
 		}

@@ -12,7 +12,7 @@ import (
 
 // GitHubClient is the subset of the GitHub client the reporter needs.
 type GitHubClient interface {
-	GetProjectItems(ctx context.Context, projectID string) ([]github.ProjectItem, error)
+	GetProjectItems(ctx context.Context, projectID string) (string, []github.ProjectItem, error)
 	GetProjectItem(ctx context.Context, itemID string) (*github.ProjectItem, error)
 }
 
@@ -83,7 +83,7 @@ func FormatNotification(item *github.ProjectItem, event, sender string) string {
 
 // SendReport fetches the project board and posts a report to the chat.
 func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) error {
-	items, err := r.github.GetProjectItems(ctx, projectID)
+	projectTitle, items, err := r.github.GetProjectItems(ctx, projectID)
 	if err != nil {
 		_ = r.bale.SendMessage(ctx, chatID, "⚠️ Could not fetch project data. Will retry at the next scheduled time.")
 		return fmt.Errorf("fetch project: %w", err)
@@ -93,7 +93,7 @@ func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) err
 		return r.bale.SendMessage(ctx, chatID, "📋 No items on the board today.")
 	}
 
-	markdown := r.Format(items)
+	markdown := r.Format(projectTitle, items)
 	chunks := splitMessage(markdown, maxMessageLen)
 	for _, chunk := range chunks {
 		if err := r.bale.SendMessage(ctx, chatID, chunk); err != nil {
@@ -104,7 +104,7 @@ func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) err
 }
 
 // Format builds a human-readable markdown summary of the project items.
-func (r *Reporter) Format(items []github.ProjectItem) string {
+func (r *Reporter) Format(projectTitle string, items []github.ProjectItem) string {
 	now := r.now().Truncate(24 * time.Hour)
 	urgentThreshold := now.AddDate(0, 0, r.urgencyDays)
 
@@ -162,7 +162,7 @@ func (r *Reporter) Format(items []github.ProjectItem) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("📋 *Board Report — %s*\n", now.Format("Jan 2, 2006")))
+	b.WriteString(fmt.Sprintf("📋 *%s — %s*\n", projectTitle, now.Format("Jan 2, 2006")))
 
 	for _, k := range keys {
 		items := grouped[k]

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(GONOSUMCHECK='*' GONOSUMDB='*' GOPROXY=direct go build *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(GONOSUMCHECK='*' GONOSUMDB='*' GOPROXY=direct go test *)",
+      "Bash(GONOSUMCHECK='*' GONOSUMDB='*' GOPROXY=direct go vet ./...)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(go test *)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new\" git push *)"
+    ]
+  }
+}

@@ -23,8 +23,8 @@ type mockGitHubClient struct {
 	err      error
 }
 
-func (m *mockGitHubClient) GetProjectItems(_ context.Context, _ string) ([]github.ProjectItem, error) {
-	return m.items, m.err
+func (m *mockGitHubClient) GetProjectItems(_ context.Context, _ string) (string, []github.ProjectItem, error) {
+	return "Test Board", m.items, m.err
 }
 
 func (m *mockGitHubClient) GetProjectItem(_ context.Context, _ string) (*github.ProjectItem, error) {
@@ -66,7 +66,7 @@ func TestReporterFormat(t *testing.T) {
 		{
 			name:  "empty board",
 			items: nil,
-			want:  []string{"📋 *Board Report — Apr 28, 2026*"},
+			want:  []string{"📋 *Test Board — Apr 28, 2026*"},
 			not:   []string{"🔴", "@", "•"},
 		},
 		{
@@ -182,7 +182,7 @@ func TestReporterFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := r.Format(tt.items)
+			got := r.Format("Test Board", tt.items)
 
 			// Check positive assertions
 			for _, w := range tt.want {

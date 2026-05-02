@@ -98,24 +98,30 @@ func (n singleItemNode) itemState() string {
 }
 
 // GetProjectItems fetches all items from a ProjectsV2 board.
-func (c *Client) GetProjectItems(ctx context.Context, projectID string) ([]ProjectItem, error) {
+// Returns the project title and items.
+func (c *Client) GetProjectItems(ctx context.Context, projectID string) (string, []ProjectItem, error) {
 	var allItems []ProjectItem
 	cursor := ""
+	projectTitle := ""
 
 	for {
 		query := buildQuery(projectID, cursor)
 		body, err := c.doGraphQL(ctx, query)
 		if err != nil {
-			return nil, fmt.Errorf("graphql request: %w", err)
+			return "", nil, fmt.Errorf("graphql request: %w", err)
 		}
 
 		var resp graphQLResponse
 		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("unmarshal response: %w", err)
+			return "", nil, fmt.Errorf("unmarshal response: %w", err)
 		}
 
 		if len(resp.Errors) > 0 {
-			return nil, fmt.Errorf("graphql errors: %v", resp.Errors)
+			return "", nil, fmt.Errorf("graphql errors: %v", resp.Errors)
+		}
+
+		if projectTitle == "" {
+			projectTitle = resp.Data.Node.Title
 		}
 
 		items := resp.Data.Node.Items
@@ -156,7 +162,7 @@ func (c *Client) GetProjectItems(ctx context.Context, projectID string) ([]Proje
 		cursor = items.PageInfo.EndCursor
 	}
 
-	return allItems, nil
+	return projectTitle, allItems, nil
 }
 
 func (c *Client) doGraphQL(ctx context.Context, query string) ([]byte, error) {
