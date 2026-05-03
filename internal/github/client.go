@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const graphqlEndpoint = "https://api.github.com/graphql"
-
 // GetProjectItem fetches a single item by its node ID.
 func (c *Client) GetProjectItem(ctx context.Context, itemID string) (*ProjectItem, error) {
 	query := fmt.Sprintf(`{
@@ -19,6 +17,7 @@ func (c *Client) GetProjectItem(ctx context.Context, itemID string) (*ProjectIte
     ... on ProjectV2Item {
       id
       type
+      updatedAt
       content {
         ... on Issue { title number url state assignees(first: 10) { nodes { login } } }
         ... on PullRequest { title number url state assignees(first: 10) { nodes { login } } }
@@ -53,6 +52,9 @@ func (c *Client) GetProjectItem(ctx context.Context, itemID string) (*ProjectIte
 		Type:  item.Type,
 		State: item.itemState(),
 	}
+	if t, err := time.Parse(time.RFC3339, item.UpdatedAt); err == nil {
+		pi.UpdatedAt = t
+	}
 	if item.Content.Title != "" {
 		pi.Title = item.Content.Title
 		pi.URL = item.Content.URL
@@ -86,6 +88,7 @@ type singleItemData struct {
 type singleItemNode struct {
 	ID          string          `json:"id"`
 	Type        string          `json:"type"`
+	UpdatedAt   string          `json:"updatedAt"`
 	Content     contentNode     `json:"content"`
 	FieldValues fieldValuePage  `json:"fieldValues"`
 }
@@ -130,6 +133,9 @@ func (c *Client) GetProjectItems(ctx context.Context, projectID string) (string,
 				ID:    item.ID,
 				Type:  item.Type,
 				State: item.State(),
+			}
+			if t, err := time.Parse(time.RFC3339, item.UpdatedAt); err == nil {
+				pi.UpdatedAt = t
 			}
 
 			if item.Content.Title != "" {
@@ -210,6 +216,7 @@ func buildQuery(projectID, cursor string) string {
         nodes {
           id
           type
+          updatedAt
           content {
             ... on Issue {
               title number url state
@@ -269,6 +276,7 @@ type pageInfo struct {
 type itemNode struct {
 	ID          string          `json:"id"`
 	Type        string          `json:"type"`
+	UpdatedAt   string          `json:"updatedAt"`
 	Content     contentNode     `json:"content"`
 	FieldValues fieldValuePage  `json:"fieldValues"`
 }

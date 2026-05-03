@@ -15,6 +15,7 @@ type ProjectItem struct {
 	Assignees []string
 	DueDate   *time.Time
 	Status    string
+	UpdatedAt time.Time
 }
 
 // Client queries a GitHub ProjectsV2 board.
