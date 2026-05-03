@@ -28,26 +28,32 @@ The CLI has three commands:
    - `project-events.yaml`
    - `project-events-manual.yaml` (optional)
 
-2. **Add secrets** (repo Settings → Secrets and variables → Actions):
+2. **Set secrets and variables** via CLI (or use repo Settings → Secrets and variables → Actions):
 
-   | Name | Value |
-   |---|---|
-   | `GH_PAT` | GitHub personal access token with `repo` and `project` scopes |
-   | `BALE_TOKEN` | Bot token from [BotFather](https://t.me/BotFather) |
+   ```bash
+   gh secret set BALE_TOKEN --repo your-org/gpb
+   # paste your Bale bot token from BotFather
 
-3. **Add variables** (repo Settings → Secrets and variables → Actions):
+   gh secret set GH_PAT --repo your-org/gpb
+   # paste a GitHub PAT with repo and project scopes
 
-   | Name | Value |
-   |---|---|
-   | `PROJECT_ID` | GitHub ProjectsV2 node ID (`PVT_...`) |
-   | `CHAT_ID` | Bale group chat ID |
-   | `URGENCY_DAYS` | (optional) Days threshold for urgent flag, defaults to `2` |
+   gh variable set PROJECT_ID --repo your-org/gpb
+   # paste your ProjectsV2 node ID (PVT_...)
 
-4. **Enable write permissions** (required for the polling state file):
-   - Repo Settings → Actions → General → Workflow permissions
-   - Select **Read and write permissions**
+   gh variable set CHAT_ID --repo your-org/gpb
+   # paste your Bale group chat ID
 
-5. **Push to the default branch** — scheduled workflows only run from the default branch.
+   gh variable set URGENCY_DAYS --repo your-org/gpb
+   # optional, defaults to 2
+   ```
+
+3. **Enable write permissions** (required for the polling state file):
+   ```bash
+   gh api repos/your-org/gpb/actions/permissions/workflow \
+     -X PUT -f default_workflow_permissions=write
+   ```
+
+4. **Push to the default branch** — scheduled workflows only run from the default branch.
 
 The first scheduled run may take up to an hour to start. You can trigger a manual run from the Actions tab immediately.
 
