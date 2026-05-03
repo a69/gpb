@@ -1,0 +1,61 @@
+# Copy this file to .github/workflows/project-events.yaml in your repo.
+#
+# Polls the project board every 5 minutes and sends Bale notifications
+# when items are created, edited, moved, or deleted.
+#
+# Required secrets:
+#   GH_PAT       — GitHub PAT with repo and read:project scopes
+#   BALE_TOKEN   — Bale bot token from BotFather
+#
+# Required variables:
+#   PROJECT_ID   — GitHub ProjectsV2 node ID (PVT_...)
+#   CHAT_ID      — Bale group chat ID
+#
+# Required repo setting:
+#   Actions → General → Workflow permissions → Read and write permissions
+
+name: project-events
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: a69/gpb
+          path: gpb
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: poll-project
+        run: |
+          cd gpb
+          go run ./cmd/gpb poll \
+            --github-token="${{ secrets.GH_PAT }}" \
+            --project-id="${{ vars.PROJECT_ID }}" \
+            --bale-token="${{ secrets.BALE_TOKEN }}" \
+            --chat-id="${{ vars.CHAT_ID }}" \
+            --state-file="${{ github.workspace }}/.gpb-state.json"
+
+      - name: save-state
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .gpb-state.json
+          if git diff --staged --quiet; then
+            echo "no state changes"
+            exit 0
+          fi
+          git -c "http.extraheader=" -c "http.https://github.com/.extraheader=" \
+            commit -m "chore: update project state cache"
+          git -c "http.extraheader=" -c "http.https://github.com/.extraheader=" \
+            push "https://x-access-token:${{ secrets.GH_PAT }}@github.com/${GITHUB_REPOSITORY}.git"

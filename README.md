@@ -4,58 +4,71 @@ Sends GitHub ProjectsV2 board updates to a Bale group chat via GitHub Actions.
 
 ## How it works
 
-Two workflows run the CLI:
+Two workflows watch your project board:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `daily-report` | `schedule` (9am UTC) or manual | Fetches the full board and sends a summary grouped by assignee with urgency flags |
-| `project-events` | `project_v2_item` (created, edited, deleted) or manual | Sends a one-line notification about the changed item |
+| `daily-report` | `schedule` (9am weekdays) or manual | Fetches the full board and sends a summary grouped by assignee with urgency flags |
+| `project-events` | `schedule` (every 5 min) or manual | Polls the board via GraphQL, diffs against cached state, and sends one-line notifications for changes |
 
-## Setup
+The CLI has three commands:
 
-### 1. Add secrets and variables to the repo
+| Command | Purpose |
+|---|---|
+| `report` | Full board summary with assignee grouping and urgency flags |
+| `poll` | Compare current board against cached state, notify on diffs |
+| `notify` | Single-item notification (used by manual dispatch) |
 
-| Name | Type | Value |
-|---|---|---|
-| `BALE_TOKEN` | Secret | Bot token from BotFather |
-| `PROJECT_ID` | Variable | GitHub ProjectsV2 node ID (`PVT_...`) |
-| `CHAT_ID` | Variable | Bale group chat ID |
-| `URGENCY_DAYS` | Variable | Days threshold for urgent flag (default: `2`) |
+## Setup for your organization
 
-`GITHUB_TOKEN` is auto-provided — no setup needed.
+### Quick start
 
-### 2. Enable workflow permissions
+1. **Copy the workflow files** from [`scaffold/`](scaffold/) into your repo's `.github/workflows/` directory:
+   - `daily-report.yaml`
+   - `project-events.yaml`
+   - `project-events-manual.yaml` (optional)
 
-In repo Settings → Actions → General → Workflow permissions, enable **Read and write permissions**.
+2. **Add secrets** (repo Settings → Secrets and variables → Actions):
 
-## CLI
+   | Name | Value |
+   |---|---|
+   | `GH_PAT` | GitHub personal access token with `repo` and `project` scopes |
+   | `BALE_TOKEN` | Bot token from [BotFather](https://t.me/BotFather) |
 
-```bash
-# Full board report
-go run ./cmd/gpb report \
-  --github-token=ghp_... \
-  --project-id=PVT_... \
-  --bale-token=... \
-  --chat-id=g-...
+3. **Add variables** (repo Settings → Secrets and variables → Actions):
 
-# Single-item notification
-go run ./cmd/gpb notify \
-  --github-token=ghp_... \
-  --item-id=PVTI_... \
-  --event=created \
-  --sender=alice \
-  --bale-token=... \
-  --chat-id=g-...
-```
+   | Name | Value |
+   |---|---|
+   | `PROJECT_ID` | GitHub ProjectsV2 node ID (`PVT_...`) |
+   | `CHAT_ID` | Bale group chat ID |
+   | `URGENCY_DAYS` | (optional) Days threshold for urgent flag, defaults to `2` |
 
-All flags also read from env vars (`GITHUB_TOKEN`, `PROJECT_ID`, `BALE_TOKEN`, `CHAT_ID`, `ITEM_ID`, `EVENT`, `SENDER`).
+4. **Enable write permissions** (required for the polling state file):
+   - Repo Settings → Actions → General → Workflow permissions
+   - Select **Read and write permissions**
+
+5. **Push to the default branch** — scheduled workflows only run from the default branch.
+
+The first scheduled run may take up to an hour to start. You can trigger a manual run from the Actions tab immediately.
+
+### PAT scopes
+
+The polling workflow commits a state file back to your repo, so the PAT needs:
+
+| Scope | Why |
+|---|---|
+| `repo` | Push state file commits back to the repo |
+| `project` | Read project items via GraphQL API |
+
+If you only need the daily report (no polling), `project` scope alone is sufficient and you can use the auto-provided `GITHUB_TOKEN` (same org only).
 
 ## Notification examples
 
 ```
 🆕 alice added Fix login crash → In Progress (assigned: bob)
 ✏️ bob updated Review PR — due tomorrow → Done
-🗑️ alice removed Old task from the board
+↔️ alice moved Clean up config → In Review
+🗑️ bob removed Old task from the board
 ```
 
 ## Daily report format
@@ -75,6 +88,69 @@ All flags also read from env vars (`GITHUB_TOKEN`, `PROJECT_ID`, `BALE_TOKEN`, `
 *Unassigned* (1 task(s))
 • Sprint retro notes — no due date
 ```
+
+## CLI reference
+
+All flags also read from env vars (`GITHUB_TOKEN`, `PROJECT_ID`, `BALE_TOKEN`, `CHAT_ID`, etc.).
+
+### `gpb report`
+
+```bash
+go run ./cmd/gpb report \
+  --github-token=ghp_... \
+  --project-id=PVT_... \
+  --bale-token=... \
+  --chat-id=g-... \
+  --urgency-days=2
+```
+
+| Flag | Env | Default | Description |
+|---|---|---|---|
+| `--github-token` | `GITHUB_TOKEN` | — | GitHub PAT |
+| `--project-id` | `PROJECT_ID` | — | ProjectsV2 node ID |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
+| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
+| `--urgency-days` | `URGENCY_DAYS` | `2` | Urgent threshold in days |
+
+### `gpb poll`
+
+```bash
+go run ./cmd/gpb poll \
+  --github-token=ghp_... \
+  --project-id=PVT_... \
+  --bale-token=... \
+  --chat-id=g-... \
+  --state-file=.gpb-state.json
+```
+
+| Flag | Env | Default | Description |
+|---|---|---|---|
+| `--github-token` | `GITHUB_TOKEN` | — | GitHub PAT |
+| `--project-id` | `PROJECT_ID` | — | ProjectsV2 node ID |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
+| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
+| `--state-file` | — | `.gpb-state.json` | Path to state cache |
+
+### `gpb notify`
+
+```bash
+go run ./cmd/gpb notify \
+  --github-token=ghp_... \
+  --item-id=PVTI_... \
+  --event=created \
+  --sender=alice \
+  --bale-token=... \
+  --chat-id=g-...
+```
+
+| Flag | Env | Default | Description |
+|---|---|---|---|
+| `--github-token` | `GITHUB_TOKEN` | — | GitHub PAT |
+| `--item-id` | `ITEM_ID` | — | Project item node ID (`PVTI_...`) |
+| `--event` | `EVENT` | — | `created`, `edited`, `moved`, `deleted` |
+| `--sender` | `SENDER` | — | GitHub username |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
+| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
 
 ## Develop
 

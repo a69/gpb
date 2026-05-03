@@ -16,3 +16,6 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# GPB state cache
+.gpb-state.json

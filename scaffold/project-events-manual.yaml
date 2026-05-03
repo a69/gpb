@@ -1,0 +1,46 @@
+# Copy this file to .github/workflows/project-events-manual.yaml in your repo.
+# Optional — lets you manually trigger a single-item notification from the
+# Actions UI. Useful for testing or one-off notifications.
+
+name: project-events (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      item_id:
+        description: "ProjectsV2 item node ID (PVTI_...)"
+        required: true
+      event:
+        description: "Event type"
+        required: true
+        type: choice
+        options: [created, edited, moved, deleted]
+      sender:
+        description: "GitHub username"
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: a69/gpb
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: send-notification
+        env:
+          ITEM_ID: ${{ github.event.inputs.item_id }}
+          EVENT: ${{ github.event.inputs.event }}
+          SENDER: ${{ github.event.inputs.sender }}
+        run: |
+          go run ./cmd/gpb notify \
+            --github-token="${{ secrets.GH_PAT }}" \
+            --item-id="${ITEM_ID}" \
+            --event="${EVENT}" \
+            --sender="${SENDER}" \
+            --bale-token="${{ secrets.BALE_TOKEN }}" \
+            --chat-id="${{ vars.CHAT_ID }}"
