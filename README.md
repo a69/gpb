@@ -23,10 +23,7 @@ The CLI has three commands:
 
 ### Quick start
 
-1. **Copy the workflow files** from [`scaffold/`](scaffold/) into your repo's `.github/workflows/` directory:
-   - `daily-report.yaml`
-   - `project-events.yaml`
-   - `project-events-manual.yaml` (optional)
+1. **Create a repo from the template:** [a69/gpb-template](https://github.com/a69/gpb-template) → **Use this template** → **Create a new repository**
 
 2. **Set secrets and variables** via CLI (or use repo Settings → Secrets and variables → Actions):
 
