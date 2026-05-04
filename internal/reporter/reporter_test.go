@@ -235,7 +235,7 @@ func TestSendReport(t *testing.T) {
 		if len(bl.messages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(bl.messages))
 		}
-		if !strings.Contains(bl.messages[0], "No items on the board") {
+		if !strings.Contains(bl.messages[0], "No items on") {
 			t.Errorf("unexpected: %s", bl.messages[0])
 		}
 	})

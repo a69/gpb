@@ -90,7 +90,7 @@ func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) err
 	}
 
 	if len(items) == 0 {
-		return r.bale.SendMessage(ctx, chatID, "📋 No items on the board today.")
+		return r.bale.SendMessage(ctx, chatID, fmt.Sprintf("📋 No items on *%s* today.", projectTitle))
 	}
 
 	markdown := r.Format(projectTitle, items)
