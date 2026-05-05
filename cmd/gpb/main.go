@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/a69/gpb/internal/bale"
 	"github.com/a69/gpb/internal/github"
+	"github.com/a69/gpb/internal/msg"
 	"github.com/a69/gpb/internal/reporter"
 )
 
@@ -35,24 +35,55 @@ func main() {
 	}
 }
 
+// resolveMessenger returns the appropriate Messenger based on flags.
+// When baleToken is set, it takes precedence and implies platform=bale (backward compat).
+func resolveMessenger(baleToken, platform, token string) (msg.Messenger, error) {
+	if baleToken != "" {
+		return msg.NewBale(baleToken), nil
+	}
+	if platform == "" {
+		platform = "bale"
+	}
+	switch platform {
+	case "bale":
+		return msg.NewBale(token), nil
+	case "telegram":
+		return msg.NewTelegram(token), nil
+	case "slack":
+		return msg.NewSlack(token), nil
+	default:
+		return nil, fmt.Errorf("unknown platform: %s (valid: bale, telegram, slack)", platform)
+	}
+}
+
+func urgencyDefault() int {
+	if v := os.Getenv("URGENCY_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return 2
+}
+
 func runReport() {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
 	githubToken := fs.String("github-token", os.Getenv("GITHUB_TOKEN"), "GitHub PAT")
 	projectID := fs.String("project-id", os.Getenv("PROJECT_ID"), "GitHub ProjectsV2 node ID")
-	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token")
-	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Bale group chat ID")
-	urgencyDefault := 2
-	if v := os.Getenv("URGENCY_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			urgencyDefault = n
-		}
-	}
-	urgencyDays := fs.Int("urgency-days", urgencyDefault, "Days threshold for urgent flag")
+	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token (backward compat)")
+	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Chat or channel ID")
+	platform := fs.String("platform", os.Getenv("PLATFORM"), "Messaging platform: bale, telegram, slack")
+	token := fs.String("token", os.Getenv("TOKEN"), "Bot token or webhook URL")
+	urgencyDays := fs.Int("urgency-days", urgencyDefault(), "Days threshold for urgent flag")
 	fs.Parse(os.Args[2:])
 
+	messenger, err := resolveMessenger(*baleToken, *platform, *token)
+	if err != nil {
+		slog.Error("failed to create messenger", "err", err)
+		os.Exit(1)
+	}
+
 	gh := github.NewClient(*githubToken)
-	bl := bale.NewClient(*baleToken)
-	r := reporter.New(gh, bl, *urgencyDays)
+	r := reporter.New(gh, messenger, *urgencyDays)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -71,20 +102,21 @@ func runNotify() {
 	itemID := fs.String("item-id", os.Getenv("ITEM_ID"), "GitHub ProjectsV2 item node ID")
 	event := fs.String("event", os.Getenv("EVENT"), "Event type (created|edited|moved|deleted)")
 	sender := fs.String("sender", os.Getenv("SENDER"), "GitHub username who triggered the event")
-	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token")
-	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Bale group chat ID")
-	urgencyDefault := 2
-	if v := os.Getenv("URGENCY_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			urgencyDefault = n
-		}
-	}
-	urgencyDays := fs.Int("urgency-days", urgencyDefault, "Days threshold for urgent flag")
+	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token (backward compat)")
+	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Chat or channel ID")
+	platform := fs.String("platform", os.Getenv("PLATFORM"), "Messaging platform: bale, telegram, slack")
+	token := fs.String("token", os.Getenv("TOKEN"), "Bot token or webhook URL")
+	urgencyDays := fs.Int("urgency-days", urgencyDefault(), "Days threshold for urgent flag")
 	fs.Parse(os.Args[2:])
 
+	messenger, err := resolveMessenger(*baleToken, *platform, *token)
+	if err != nil {
+		slog.Error("failed to create messenger", "err", err)
+		os.Exit(1)
+	}
+
 	gh := github.NewClient(*githubToken)
-	bl := bale.NewClient(*baleToken)
-	r := reporter.New(gh, bl, *urgencyDays)
+	r := reporter.New(gh, messenger, *urgencyDays)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -101,21 +133,22 @@ func runPoll() {
 	fs := flag.NewFlagSet("poll", flag.ExitOnError)
 	githubToken := fs.String("github-token", os.Getenv("GITHUB_TOKEN"), "GitHub PAT")
 	projectID := fs.String("project-id", os.Getenv("PROJECT_ID"), "GitHub ProjectsV2 node ID")
-	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token")
-	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Bale group chat ID")
+	baleToken := fs.String("bale-token", os.Getenv("BALE_TOKEN"), "Bale bot token (backward compat)")
+	chatID := fs.String("chat-id", os.Getenv("CHAT_ID"), "Chat or channel ID")
 	stateFile := fs.String("state-file", ".gpb-state.json", "Path to state cache file")
-	urgencyDefault := 2
-	if v := os.Getenv("URGENCY_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			urgencyDefault = n
-		}
-	}
-	urgencyDays := fs.Int("urgency-days", urgencyDefault, "Days threshold for urgent flag")
+	platform := fs.String("platform", os.Getenv("PLATFORM"), "Messaging platform: bale, telegram, slack")
+	token := fs.String("token", os.Getenv("TOKEN"), "Bot token or webhook URL")
+	urgencyDays := fs.Int("urgency-days", urgencyDefault(), "Days threshold for urgent flag")
 	fs.Parse(os.Args[2:])
 
+	messenger, err := resolveMessenger(*baleToken, *platform, *token)
+	if err != nil {
+		slog.Error("failed to create messenger", "err", err)
+		os.Exit(1)
+	}
+
 	gh := github.NewClient(*githubToken)
-	bl := bale.NewClient(*baleToken)
-	r := reporter.New(gh, bl, *urgencyDays)
+	r := reporter.New(gh, messenger, *urgencyDays)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -138,8 +171,8 @@ func runPoll() {
 
 	for _, ch := range changes {
 		item := ch.Item
-		msg := reporter.FormatNotification(&item, ch.Event, ch.Sender)
-		if err := bl.SendMessage(ctx, *chatID, msg); err != nil {
+		msgText := reporter.FormatNotification(&item, ch.Event, ch.Sender)
+		if err := messenger.SendMessage(ctx, *chatID, msgText); err != nil {
 			slog.Error("failed to send notification", "item", item.ID, "err", err)
 			continue
 		}

@@ -28,11 +28,19 @@ on:
       chat-id:
         required: true
         type: string
+      platform:
+        required: false
+        type: string
+        default: "bale"
+        description: "Messaging platform: bale, telegram, slack"
     secrets:
       github-token:
         required: true
       bale-token:
-        required: true
+        required: false
+      token:
+        required: false
+        description: "Bot token or webhook URL (for non-Bale platforms)"
 
 jobs:
   notify:
@@ -52,6 +60,8 @@ jobs:
           GH_TOKEN: ${{ secrets.github-token || secrets.GITHUB_TOKEN }}
           BALE_TOKEN: ${{ secrets.bale-token || secrets.BALE_TOKEN }}
           CHAT_ID: ${{ inputs.chat-id || vars.CHAT_ID }}
+          PLATFORM: ${{ inputs.platform || 'bale' }}
+          TOKEN: ${{ secrets.token || secrets.TOKEN }}
         run: |
           go run ./cmd/gpb notify \
             --github-token="${GH_TOKEN}" \
@@ -59,4 +69,6 @@ jobs:
             --event="${EVENT}" \
             --sender="${SENDER}" \
             --bale-token="${BALE_TOKEN}" \
-            --chat-id="${CHAT_ID}"
+            --chat-id="${CHAT_ID}" \
+            --platform="${PLATFORM}" \
+            --token="${TOKEN}"

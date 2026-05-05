@@ -16,15 +16,15 @@ type GitHubClient interface {
 	GetProjectItem(ctx context.Context, itemID string) (*github.ProjectItem, error)
 }
 
-// BaleClient is the subset of the Bale client the reporter needs.
-type BaleClient interface {
+// Messenger sends messages to a chat or channel.
+type Messenger interface {
 	SendMessage(ctx context.Context, chatID, text string) error
 }
 
 // Reporter fetches project data, formats it, and posts to chat.
 type Reporter struct {
 	github      GitHubClient
-	bale        BaleClient
+	msg         Messenger
 	urgencyDays int
 	now         func() time.Time
 }
@@ -32,22 +32,22 @@ type Reporter struct {
 const maxMessageLen = 4000
 
 // New creates a reporter.
-func New(gh GitHubClient, bl BaleClient, urgencyDays int) *Reporter {
+func New(gh GitHubClient, m Messenger, urgencyDays int) *Reporter {
 	if urgencyDays <= 0 {
 		urgencyDays = 2
 	}
-	return &Reporter{github: gh, bale: bl, urgencyDays: urgencyDays, now: time.Now}
+	return &Reporter{github: gh, msg: m, urgencyDays: urgencyDays, now: time.Now}
 }
 
 // SendNotification sends a single-item event notification to the chat.
 func (r *Reporter) SendNotification(ctx context.Context, chatID, itemID string, event string, sender string) error {
 	item, err := r.github.GetProjectItem(ctx, itemID)
 	if err != nil {
-		_ = r.bale.SendMessage(ctx, chatID, fmt.Sprintf("⚠️ Could not fetch item details for %s.", itemID))
+		_ = r.msg.SendMessage(ctx, chatID, fmt.Sprintf("⚠️ Could not fetch item details for %s.", itemID))
 		return fmt.Errorf("fetch item: %w", err)
 	}
 	msg := FormatNotification(item, event, sender)
-	return r.bale.SendMessage(ctx, chatID, msg)
+	return r.msg.SendMessage(ctx, chatID, msg)
 }
 
 // FormatNotification formats a single-item change into a short message.
@@ -85,18 +85,18 @@ func FormatNotification(item *github.ProjectItem, event, sender string) string {
 func (r *Reporter) SendReport(ctx context.Context, chatID, projectID string) error {
 	projectTitle, items, err := r.github.GetProjectItems(ctx, projectID)
 	if err != nil {
-		_ = r.bale.SendMessage(ctx, chatID, "⚠️ Could not fetch project data. Will retry at the next scheduled time.")
+		_ = r.msg.SendMessage(ctx, chatID, "⚠️ Could not fetch project data. Will retry at the next scheduled time.")
 		return fmt.Errorf("fetch project: %w", err)
 	}
 
 	if len(items) == 0 {
-		return r.bale.SendMessage(ctx, chatID, fmt.Sprintf("📋 No items on *%s* today.", projectTitle))
+		return r.msg.SendMessage(ctx, chatID, fmt.Sprintf("📋 No items on *%s* today.", projectTitle))
 	}
 
 	markdown := r.Format(projectTitle, items)
 	chunks := splitMessage(markdown, maxMessageLen)
 	for _, chunk := range chunks {
-		if err := r.bale.SendMessage(ctx, chatID, chunk); err != nil {
+		if err := r.msg.SendMessage(ctx, chatID, chunk); err != nil {
 			return fmt.Errorf("send message: %w", err)
 		}
 	}

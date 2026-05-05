@@ -1,4 +1,4 @@
-package bale
+package msg
 
 import (
 	"context"
@@ -8,19 +8,19 @@ import (
 	"testing"
 )
 
-func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
+func newTelegramTestClient(t *testing.T, handler http.HandlerFunc) *TelegramClient {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	c := NewClient("TestToken")
+	c := NewTelegram("TestToken")
 	c.baseURL = srv.URL
 	c.httpClient = srv.Client()
 	return c
 }
 
-func TestClientSendMessage(t *testing.T) {
+func TestTelegramSendMessage(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		c := newTelegramTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
 				t.Errorf("expected POST, got %s", r.Method)
 			}
@@ -49,7 +49,7 @@ func TestClientSendMessage(t *testing.T) {
 	})
 
 	t.Run("api error returns error", func(t *testing.T) {
-		c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		c := newTelegramTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(`{"description":"Bad Request"}`))
 		})
@@ -62,4 +62,26 @@ func TestClientSendMessage(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestBaleSendMessage(t *testing.T) {
+	// Verify Bale uses the same protocol as Telegram.
+	c := NewBale("BaleToken")
+	if c.baseURL != "https://tapi.bale.ai" {
+		t.Errorf("Bale baseURL = %q, want https://tapi.bale.ai", c.baseURL)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "/botBaleToken/sendMessage") {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c.baseURL = srv.URL
+	c.httpClient = srv.Client()
+	if err := c.SendMessage(context.Background(), "g-1", "test"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

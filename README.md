@@ -1,6 +1,14 @@
-# gpb — GitHub Project Board reporter for Bale Messenger
+# gpb — GitHub Project Board reporter
 
-Sends GitHub ProjectsV2 board updates to a Bale group chat via GitHub Actions.
+Sends GitHub ProjectsV2 board updates to Bale, Telegram, Slack, or any supported messaging platform via GitHub Actions.
+
+## Supported platforms
+
+| Platform | Transport | `--token` value |
+|---|---|---|
+| Bale | Bot API (`tapi.bale.ai`) | Bot token from BotFather |
+| Telegram | Bot API (`api.telegram.org`) | Bot token from BotFather |
+| Slack | Incoming webhook | Webhook URL |
 
 ## How it works
 
@@ -27,18 +35,43 @@ The CLI has three commands:
 
 2. **Set secrets and variables** via CLI (or use repo Settings → Secrets and variables → Actions):
 
+   **Bale:**
    ```bash
    gh secret set BALE_TOKEN --repo your-org/gpb
    # paste your Bale bot token from BotFather
 
+   gh variable set CHAT_ID --repo your-org/gpb
+   # paste your Bale group chat ID
+   ```
+
+   **Telegram:**
+   ```bash
+   gh secret set TOKEN --repo your-org/gpb
+   # paste your Telegram bot token from BotFather
+
+   gh variable set PLATFORM --repo your-org/gpb
+   # set to "telegram"
+
+   gh variable set CHAT_ID --repo your-org/gpb
+   # paste your Telegram chat or group ID
+   ```
+
+   **Slack:**
+   ```bash
+   gh secret set TOKEN --repo your-org/gpb
+   # paste your Slack incoming webhook URL
+
+   gh variable set PLATFORM --repo your-org/gpb
+   # set to "slack"
+   ```
+
+   **Common (all platforms):**
+   ```bash
    gh secret set GH_PAT --repo your-org/gpb
    # paste a GitHub PAT with repo and project scopes
 
    gh variable set PROJECT_ID --repo your-org/gpb
    # paste your ProjectsV2 node ID (PVT_...)
-
-   gh variable set CHAT_ID --repo your-org/gpb
-   # paste your Bale group chat ID
 
    gh variable set URGENCY_DAYS --repo your-org/gpb
    # optional, defaults to 2
@@ -94,25 +127,42 @@ If you only need the daily report (no polling), `project` scope alone is suffici
 
 ## CLI reference
 
-All flags also read from env vars (`GITHUB_TOKEN`, `PROJECT_ID`, `BALE_TOKEN`, `CHAT_ID`, etc.).
+All flags also read from env vars (`GITHUB_TOKEN`, `PROJECT_ID`, `BALE_TOKEN`, `TOKEN`, `PLATFORM`, `CHAT_ID`, etc.). Bale users can continue using `--bale-token` / `BALE_TOKEN` — it takes precedence over `--token`.
 
 ### `gpb report`
 
 ```bash
+# Bale (backward compat)
 go run ./cmd/gpb report \
   --github-token=ghp_... \
   --project-id=PVT_... \
   --bale-token=... \
-  --chat-id=g-... \
-  --urgency-days=2
+  --chat-id=g-...
+
+# Telegram
+go run ./cmd/gpb report \
+  --github-token=ghp_... \
+  --project-id=PVT_... \
+  --platform=telegram \
+  --token=... \
+  --chat-id=...
+
+# Slack
+go run ./cmd/gpb report \
+  --github-token=ghp_... \
+  --project-id=PVT_... \
+  --platform=slack \
+  --token=https://hooks.slack.com/services/...
 ```
 
 | Flag | Env | Default | Description |
 |---|---|---|---|
 | `--github-token` | `GITHUB_TOKEN` | — | GitHub PAT |
 | `--project-id` | `PROJECT_ID` | — | ProjectsV2 node ID |
-| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
-| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token (backward compat, implies `--platform=bale`) |
+| `--platform` | `PLATFORM` | `bale` | Messaging platform: `bale`, `telegram`, `slack` |
+| `--token` | `TOKEN` | — | Bot token or webhook URL |
+| `--chat-id` | `CHAT_ID` | — | Chat or channel ID (not needed for Slack) |
 | `--urgency-days` | `URGENCY_DAYS` | `2` | Urgent threshold in days |
 
 ### `gpb poll`
@@ -121,8 +171,9 @@ go run ./cmd/gpb report \
 go run ./cmd/gpb poll \
   --github-token=ghp_... \
   --project-id=PVT_... \
-  --bale-token=... \
-  --chat-id=g-... \
+  --platform=telegram \
+  --token=... \
+  --chat-id=... \
   --state-file=.gpb-state.json
 ```
 
@@ -130,8 +181,10 @@ go run ./cmd/gpb poll \
 |---|---|---|---|
 | `--github-token` | `GITHUB_TOKEN` | — | GitHub PAT |
 | `--project-id` | `PROJECT_ID` | — | ProjectsV2 node ID |
-| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
-| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token (backward compat) |
+| `--platform` | `PLATFORM` | `bale` | Messaging platform: `bale`, `telegram`, `slack` |
+| `--token` | `TOKEN` | — | Bot token or webhook URL |
+| `--chat-id` | `CHAT_ID` | — | Chat or channel ID |
 | `--state-file` | — | `.gpb-state.json` | Path to state cache |
 
 ### `gpb notify`
@@ -142,8 +195,9 @@ go run ./cmd/gpb notify \
   --item-id=PVTI_... \
   --event=created \
   --sender=alice \
-  --bale-token=... \
-  --chat-id=g-...
+  --platform=telegram \
+  --token=... \
+  --chat-id=...
 ```
 
 | Flag | Env | Default | Description |
@@ -152,8 +206,10 @@ go run ./cmd/gpb notify \
 | `--item-id` | `ITEM_ID` | — | Project item node ID (`PVTI_...`) |
 | `--event` | `EVENT` | — | `created`, `edited`, `moved`, `deleted` |
 | `--sender` | `SENDER` | — | GitHub username |
-| `--bale-token` | `BALE_TOKEN` | — | Bale bot token |
-| `--chat-id` | `CHAT_ID` | — | Bale group chat ID |
+| `--bale-token` | `BALE_TOKEN` | — | Bale bot token (backward compat) |
+| `--platform` | `PLATFORM` | `bale` | Messaging platform: `bale`, `telegram`, `slack` |
+| `--token` | `TOKEN` | — | Bot token or webhook URL |
+| `--chat-id` | `CHAT_ID` | — | Chat or channel ID |
 
 ## Develop
 

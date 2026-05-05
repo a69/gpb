@@ -31,20 +31,20 @@ func (m *mockGitHubClient) GetProjectItem(_ context.Context, _ string) (*github.
 	return m.singleItem, m.err
 }
 
-type mockBaleClient struct {
+type mockMessenger struct {
 	messages []string
 	err      error
 }
 
-func (m *mockBaleClient) SendMessage(_ context.Context, chatID, text string) error {
+func (m *mockMessenger) SendMessage(_ context.Context, chatID, text string) error {
 	m.messages = append(m.messages, text)
 	return m.err
 }
 
 // ---------- helpers ----------
 
-func newTestReporter(gh GitHubClient, bl BaleClient, urgencyDays int) *Reporter {
-	r := New(gh, bl, urgencyDays)
+func newTestReporter(gh GitHubClient, m Messenger, urgencyDays int) *Reporter {
+	r := New(gh, m, urgencyDays)
 	r.now = func() time.Time { return time.Date(2026, 4, 28, 10, 30, 0, 0, time.UTC) }
 	return r
 }
@@ -208,7 +208,7 @@ func TestSendReport(t *testing.T) {
 
 	t.Run("github error sends warning", func(t *testing.T) {
 		gh := &mockGitHubClient{err: errors.New("network down")}
-		bl := &mockBaleClient{}
+		bl := &mockMessenger{}
 		r := newTestReporter(gh, bl, 2)
 
 		err := r.SendReport(ctx, "g-1", "PVT_1")
@@ -225,7 +225,7 @@ func TestSendReport(t *testing.T) {
 
 	t.Run("empty board sends no-items message", func(t *testing.T) {
 		gh := &mockGitHubClient{items: nil}
-		bl := &mockBaleClient{}
+		bl := &mockMessenger{}
 		r := newTestReporter(gh, bl, 2)
 
 		err := r.SendReport(ctx, "g-1", "PVT_1")
@@ -244,7 +244,7 @@ func TestSendReport(t *testing.T) {
 		gh := &mockGitHubClient{items: []github.ProjectItem{
 			{Title: "Task 1", URL: "https://gh/1", Assignees: []string{"alice"}},
 		}}
-		bl := &mockBaleClient{}
+		bl := &mockMessenger{}
 		r := newTestReporter(gh, bl, 2)
 
 		err := r.SendReport(ctx, "g-1", "PVT_1")
@@ -263,7 +263,7 @@ func TestSendReport(t *testing.T) {
 		gh := &mockGitHubClient{items: []github.ProjectItem{
 			{Title: "Task 1", Assignees: []string{"alice"}},
 		}}
-		bl := &mockBaleClient{err: errors.New("send failed")}
+		bl := &mockMessenger{err: errors.New("send failed")}
 		r := newTestReporter(gh, bl, 2)
 
 		err := r.SendReport(ctx, "g-1", "PVT_1")

@@ -1,4 +1,4 @@
-package bale
+package msg
 
 import (
 	"context"
@@ -9,16 +9,25 @@ import (
 	"strings"
 )
 
-// Client sends messages to Bale chats.
-type Client struct {
+// TelegramClient sends messages via the Telegram Bot API (or Bale, which uses the same protocol).
+type TelegramClient struct {
 	token      string
 	httpClient *http.Client
 	baseURL    string
 }
 
-// NewClient creates a Bale client with the given bot token.
-func NewClient(token string) *Client {
-	return &Client{
+// NewTelegram creates a client for Telegram.
+func NewTelegram(token string) *TelegramClient {
+	return &TelegramClient{
+		token:      token,
+		httpClient: http.DefaultClient,
+		baseURL:    "https://api.telegram.org",
+	}
+}
+
+// NewBale creates a client for Bale Messenger.
+func NewBale(token string) *TelegramClient {
+	return &TelegramClient{
 		token:      token,
 		httpClient: http.DefaultClient,
 		baseURL:    "https://tapi.bale.ai",
@@ -26,7 +35,7 @@ func NewClient(token string) *Client {
 }
 
 // SendMessage posts text to a chat.
-func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
+func (c *TelegramClient) SendMessage(ctx context.Context, chatID, text string) error {
 	endpoint := fmt.Sprintf("%s/bot%s/sendMessage", c.baseURL, c.token)
 	form := url.Values{}
 	form.Set("chat_id", chatID)
@@ -47,7 +56,7 @@ func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("bale sendMessage: status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("telegram sendMessage: status %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

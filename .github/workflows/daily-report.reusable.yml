@@ -13,11 +13,19 @@ on:
         required: false
         type: string
         default: "2"
+      platform:
+        required: false
+        type: string
+        default: "bale"
+        description: "Messaging platform: bale, telegram, slack"
     secrets:
       github-token:
         required: true
       bale-token:
-        required: true
+        required: false
+      token:
+        required: false
+        description: "Bot token or webhook URL (for non-Bale platforms)"
 
 jobs:
   report:
@@ -33,6 +41,8 @@ jobs:
           go run ./cmd/gpb report \
             --github-token="${{ secrets.github-token }}" \
             --project-id="${{ inputs.project-id }}" \
-            --bale-token="${{ secrets.bale-token }}" \
             --chat-id="${{ inputs.chat-id }}" \
-            --urgency-days="${{ inputs.urgency-days }}"
+            --urgency-days="${{ inputs.urgency-days }}" \
+            --bale-token="${{ secrets.bale-token }}" \
+            --platform="${{ inputs.platform }}" \
+            --token="${{ secrets.token }}"
